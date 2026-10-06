@@ -32,7 +32,7 @@ def ask_json(system: str, user: str, retries: int = 2) -> dict:
                 raise
             time.sleep(2)
 
-def ask_text(system: str, user: str, max_tokens: int = 1500) -> str:
+def ask_text(system: str, user: str, max_tokens: int = 4000) -> str:
     resp = client.chat.completions.create(
         model=LLM_MODEL,
         temperature=0.4,
@@ -42,4 +42,4 @@ def ask_text(system: str, user: str, max_tokens: int = 1500) -> str:
             {"role": "user", "content": user},
         ],
     )
-    return resp.choices[0].message.content.strip()
+    return (resp.choices[0].message.content or "").strip()
