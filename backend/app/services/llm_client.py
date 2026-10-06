@@ -1,5 +1,5 @@
 import json, time
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 
 client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
@@ -23,15 +23,23 @@ def ask_json(system: str, user: str, retries: int = 2) -> dict:
                 ],
             )
             return json.loads(_strip_fences(resp.choices[0].message.content))
+        except RateLimitError as e:
+            if "PerDay" in str(e) or attempt == retries:
+                raise
+            time.sleep(15)
         except Exception:
             if attempt == retries:
                 raise
-            time.sleep(1.5)
+            time.sleep(2)
 
-def ask_text(system: str, user: str, max_tokens: int = 600) -> str:
+def ask_text(system: str, user: str, max_tokens: int = 1500) -> str:
     resp = client.chat.completions.create(
-        model=LLM_MODEL, temperature=0.4, max_tokens=max_tokens,
-        messages=[{"role": "system", "content": system},
-                  {"role": "user", "content": user}],
+        model=LLM_MODEL,
+        temperature=0.4,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
     return resp.choices[0].message.content.strip()
