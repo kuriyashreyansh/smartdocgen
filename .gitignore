@@ -150,6 +150,8 @@ activemq-data/
 *.sage.py
 
 # Environments
+.env.local
+**/.env
 .env
 .envrc
 .venv
@@ -219,3 +221,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+storage/outputs/
+storage/logos/
+*.sqlite3
+*.db
+.streamlit/secrets.toml
+node_modules/
