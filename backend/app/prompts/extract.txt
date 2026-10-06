@@ -1,0 +1,6 @@
+Extract field values from the user's request for the given document type.
+RULES:
+- Use ONLY information explicitly written in the request.
+- If a field is not stated, return null. Never guess or infer dates, venues, names or numbers.
+- Copy values exactly as written. Do not rephrase names or venues.
+- Return JSON only, with exactly the field keys provided.
