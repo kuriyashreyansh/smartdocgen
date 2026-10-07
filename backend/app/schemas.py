@@ -5,8 +5,9 @@ class GenerateRequest(BaseModel):
     club_id: int = 1
     fields: dict
     detail_level: str = "standard"
-    document_id: int | None = None   # set this to create a new version of an existing document
-
+    include_ai_section: bool = False   # off by default: no AI text unless asked
+    document_id: int | None = None     # set to create a new version of an existing document
+    
 class GenerateResponse(BaseModel):
     document_id: int
     version: int
