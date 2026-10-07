@@ -1,0 +1,18 @@
+[
+  {
+    "type_id": "permission_letter",
+    "name": "Event Permission Letter",
+    "description": "Letter asking college authorities for permission to hold an event",
+    "template_file": "permission_letter.docx",
+    "ref_code": "PL",
+    "fields": [
+      {"key": "event_name", "label": "Event name", "type": "text", "required": true},
+      {"key": "event_date", "label": "Event date", "type": "date", "required": true},
+      {"key": "venue", "label": "Venue", "type": "text", "required": true},
+      {"key": "faculty_coordinator", "label": "Faculty coordinator", "type": "text", "required": true},
+      {"key": "recipient_designation", "label": "Addressed to (designation)", "type": "text", "required": true},
+      {"key": "expected_participants", "label": "Expected participants", "type": "number", "required": false}
+    ],
+    "ai_sections": ["purpose_paragraph"]
+  }
+]
