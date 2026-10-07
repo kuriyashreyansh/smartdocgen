@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
-from app.routers import generate,ai,documents
+from app.routers import generate,ai,documents,templates
 
 Base.metadata.create_all(engine)
 
@@ -18,6 +18,7 @@ app.mount("/files", StaticFiles(directory=OUTPUTS), name="files")
 app.include_router(generate.router)
 app.include_router(ai.router)
 app.include_router(documents.router)
+app.include_router(templates.router)
 
 @app.get("/health")
 def health():
