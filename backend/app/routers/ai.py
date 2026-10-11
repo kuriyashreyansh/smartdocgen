@@ -14,4 +14,8 @@ class SectionRequest(BaseModel):
 def ai_section(req: SectionRequest):
     facts = {k: v for k, v in req.facts.items() if v not in (None, "")}
     text = write_section(req.section, facts, req.detail_level, req.tone)
-    return {"text": text, "ai_generated": True}
+    if not text:
+        return {"text": "", "ai_generated": False,
+                "message": "The AI could not write this section from the details given. "
+                           "Add more notes, or write it yourself."}
+    return {"text": text, "ai_generated": True, "message": ""}

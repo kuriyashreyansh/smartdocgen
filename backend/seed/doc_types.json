@@ -1,14 +1,42 @@
 [
   {
     "type_id": "permission_letter",
+<<<<<<< HEAD
+    "name": "Permission (Venue / Room)",
+    "description": "Official request to the HoD or another authority for permission to conduct an event or use a venue such as a seminar hall or classroom",
+    "template_file": "permission_letter.docx",
+    "ref_code": "ROOM",
+    "ref_pattern": "{prefix}/{session_short}/{code}/{seq:03d}",
+    "fields": [
+      {"key": "submitted_to", "label": "Submitted to", "type": "text", "required": true},
+=======
     "name": "Event Permission Letter",
     "description": "Formal letter asking college authorities for permission to organise an event or activity",
     "template_file": "permission_letter.docx",
     "fields": [
       {"key": "club_name", "label": "Club name", "type": "text", "required": true},
+>>>>>>> da49a66c73dbe8f74558a16b3f5d5bbad82d56a8
       {"key": "event_name", "label": "Event name", "type": "text", "required": true},
-      {"key": "event_date", "label": "Event date", "type": "date", "required": true},
       {"key": "venue", "label": "Venue", "type": "text", "required": true},
+<<<<<<< HEAD
+      {"key": "event_date", "label": "Event date", "type": "date", "required": true},
+      {"key": "start_time", "label": "Start time", "type": "text", "required": true},
+      {"key": "end_time", "label": "End time", "type": "text", "required": true},
+      {"key": "brief_description", "label": "Brief description", "type": "longtext", "required": true},
+      {"key": "objective", "label": "Objective", "type": "longtext", "required": true},
+      {"key": "expected_participants", "label": "Number of participants", "type": "text", "required": true},
+      {"key": "mode", "label": "Mode", "type": "text", "required": true, "options": ["Offline", "Online", "Hybrid"]},
+      {"key": "event_organizers", "label": "Event organizers", "type": "text", "required": true},
+      {"key": "tech_name", "label": "Tech assistant: name", "type": "text", "required": true},
+      {"key": "tech_designation", "label": "Tech assistant: designation", "type": "text", "required": true},
+      {"key": "tech_branch", "label": "Tech assistant: branch", "type": "text", "required": false},
+      {"key": "tech_mobile", "label": "Tech assistant: mobile", "type": "text", "required": false},
+      {"key": "incharge_name", "label": "Faculty in-charge: name", "type": "text", "required": true},
+      {"key": "incharge_designation", "label": "Faculty in-charge: designation", "type": "text", "required": true},
+      {"key": "incharge_branch", "label": "Faculty in-charge: branch", "type": "text", "required": false}
+    ],
+    "ai_sections": ["brief_description", "objective"]
+=======
       {"key": "expected_participants", "label": "Expected participants", "type": "number", "required": false},
       {"key": "faculty_coordinator", "label": "Faculty coordinator", "type": "text", "required": true}
     ]
@@ -40,5 +68,6 @@
       {"key": "purpose", "label": "Purpose of funds", "type": "text", "required": true},
       {"key": "faculty_coordinator", "label": "Faculty coordinator", "type": "text", "required": true}
     ]
+>>>>>>> da49a66c73dbe8f74558a16b3f5d5bbad82d56a8
   }
 ]
