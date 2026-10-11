@@ -15,7 +15,7 @@
       {"key": "end_time", "label": "End time", "type": "text", "required": true},
       {"key": "brief_description", "label": "Brief description", "type": "longtext", "required": true},
       {"key": "objective", "label": "Objective", "type": "longtext", "required": true},
-      {"key": "expected_participants", "label": "Number of participants", "type": "text", "required": true},
+      {"key": "expected_participants", "label": "Number of participants", "type": "number", "required": true},
       {"key": "mode", "label": "Mode", "type": "text", "required": true, "options": ["Offline", "Online", "Hybrid"]},
       {"key": "event_organizers", "label": "Event organizers", "type": "text", "required": true},
       {"key": "tech_name", "label": "Tech assistant: name", "type": "text", "required": true},
