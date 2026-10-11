@@ -58,3 +58,23 @@ def validate(data, fields):
             })
 
     return {"is_complete": len(missing) == 0, "missing": missing}
+
+import json
+from app.services.validator import validate
+
+# Load the real schema written earlier
+with open("seed/doc_types.json", encoding="utf-8") as f:
+    doc_types = json.load(f)
+
+permission = next(d for d in doc_types if d["type_id"] == "permission_letter")
+
+# Case 1: venue and coordinator are missing
+data = {"club_name": "Coding Club", "event_name": "TechFest",
+        "event_date": "2027-02-12", "venue": None,
+        "expected_participants": 200, "faculty_coordinator": None}
+print(validate(data, permission["fields"]))
+
+# Case 2: everything is filled
+data["venue"] = "Seminar Hall"
+data["faculty_coordinator"] = "Prof. Mehta"
+print(validate(data, permission["fields"]))
