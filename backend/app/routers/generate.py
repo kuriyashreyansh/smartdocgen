@@ -10,9 +10,28 @@ from app.services.renderer import render_docx
 from app.services.pdf_converter import docx_to_pdf
 
 router = APIRouter()
+DEFAULT_PATTERN = "{prefix}/{session_short}/{code}/{seq:03d}"
 
 def _clean(d: dict) -> dict:
     return {k: v for k, v in d.items() if v not in (None, "")}
+
+def academic_session(today: datetime | None = None):
+    """The academic year starts in July: Oct 2026 -> 2026-27."""
+    today = today or datetime.now()
+    start = today.year if today.month >= 7 else today.year - 1
+    end = start + 1
+    return start, {"session_short": f"{start % 100:02d}-{end % 100:02d}",
+                   "session_long": f"{start}-{end % 100:02d}"}
+
+def make_ref_no(db: Session, club: Club, doc_type: DocType) -> str:
+    start, names = academic_session()
+    count = (db.query(func.count(Document.id))
+               .filter(Document.club_id == club.id,
+                       Document.doc_type_id == doc_type.id,
+                       Document.created_at >= datetime(start, 7, 1))
+               .scalar())
+    pattern = doc_type.ref_pattern or DEFAULT_PATTERN
+    return pattern.format(prefix=club.ref_prefix, code=doc_type.ref_code, seq=count + 1, **names)
 
 @router.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest, db: Session = Depends(get_db)):
@@ -30,13 +49,6 @@ def generate(req: GenerateRequest, db: Session = Depends(get_db)):
     if missing:
         raise HTTPException(422, detail={"missing": missing})
 
-    # Optional AI-written paragraph (only if asked, and not already supplied or edited by the user)
-    if ("purpose_paragraph" in (doc_type.ai_sections or [])
-            and req.include_ai_section and "purpose_paragraph" not in fields):
-        from app.services.content_writer import write_section
-        facts = {k: v for k, v in fields.items() if k not in ("recipient_designation", "faculty_coordinator")}
-        fields["purpose_paragraph"] = write_section("Purpose of the event", facts, req.detail_level)
-
     # New document, or a new version of an existing one
     if req.document_id:
         doc = db.get(Document, req.document_id)
@@ -44,25 +56,20 @@ def generate(req: GenerateRequest, db: Session = Depends(get_db)):
             raise HTTPException(404, "Document not found")
         version = len(doc.versions) + 1
     else:
-        year = datetime.now().year
-        count = (db.query(func.count(Document.id))
-                   .filter(Document.club_id == club.id,
-                           Document.doc_type_id == doc_type.id,
-                           Document.ref_no.like(f"%/{year}/%"))
-                   .scalar())
-        ref_no = f"{club.ref_prefix}/{year}/{doc_type.ref_code}/{count + 1:03d}"
-        doc = Document(club_id=club.id, doc_type_id=doc_type.id, ref_no=ref_no)
+        doc = Document(club_id=club.id, doc_type_id=doc_type.id,
+                       ref_no=fields.get("ref_no") or make_ref_no(db, club, doc_type))
         db.add(doc)
         db.flush()
         version = 1
 
     context = {
-        **fields,
+        **(club.officials or {}),          # office-bearers, reused in every document
+        **fields,                          # what the user entered (can override the officials)
         "club_full_name": club.full_name,
         "signatory_name": club.signatory_name,
         "signatory_designation": club.signatory_designation,
         "ref_no": doc.ref_no,
-        "letter_date": datetime.now().strftime("%d %B %Y"),
+        "letter_date": fields.get("letter_date") or datetime.now().strftime("%d %B %Y"),
     }
 
     base = f"{doc.id}_v{version}"

@@ -2,5 +2,7 @@ Write a section of an official club document.
 Use ONLY the facts provided. Every statement must be directly supported by them.
 Do not add speakers, guests, activities, prizes, resources, facilities, rules, requirements, benefits, outcomes or links to any curriculum or goals unless they appear in the facts.
 Never repeat a fact. State each fact once.
+Follow the "What to write" instruction for the section.
+If the facts do not give enough information to write this section, reply with exactly: NONE
 If the facts are few, write fewer sentences. Being short is better than inventing or repeating.
 Return plain text only, with no headings or bullet points.
