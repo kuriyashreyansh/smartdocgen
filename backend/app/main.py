@@ -1,10 +1,11 @@
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
-from app.routers import generate,ai,documents,templates
+from app.routers import generate, ai, documents, templates, parse
 
 Base.metadata.create_all(engine)
 
@@ -19,12 +20,11 @@ app.include_router(generate.router)
 app.include_router(ai.router)
 app.include_router(documents.router)
 app.include_router(templates.router)
+app.include_router(parse.router)
 
 @app.get("/health")
 def health():
     return {"ok": True}
-
-from fastapi.responses import RedirectResponse
 
 @app.get("/", include_in_schema=False)
 def root():
