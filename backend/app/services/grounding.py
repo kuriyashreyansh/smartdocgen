@@ -20,12 +20,13 @@ def _in_text(value, text):
     # Fuzzy match to tolerate small spelling differences
     return fuzz.partial_ratio(v, t) >= FUZZY_THRESHOLD
 
-
 def _number_in_text(value, text):
-    """Check whether a number (e.g. 200) appears in the text as a number."""
-    digits = str(value).replace(",", "").strip()
-    text_digits = text.replace(",", "")
-    return digits in re.findall(r"\d+(?:\.\d+)?", text_digits)
+    """Check whether the number inside the value appears in the text."""
+    found = re.findall(r"\d+(?:\.\d+)?", str(value).replace(",", ""))
+    if not found:
+        return False  # no digits at all, e.g. "not decided"
+    text_numbers = re.findall(r"\d+(?:\.\d+)?", text.replace(",", ""))
+    return all(n in text_numbers for n in found)
 
 
 def ground(extracted, original_text, fields):
