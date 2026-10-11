@@ -27,5 +27,35 @@
       {"key": "incharge_branch", "label": "Faculty in-charge: branch", "type": "text", "required": false}
     ],
     "ai_sections": ["brief_description", "objective"]
+  },
+  {
+    "type_id": "invitation_notice",
+    "name": "Invitation Notice",
+    "description": "Notice or invitation announcing an event to students",
+    "template_file": "invitation_notice.docx",
+    "ref_code": "INV",
+    "fields": [
+      {"key": "club_name", "label": "Club name", "type": "text", "required": true},
+      {"key": "event_name", "label": "Event name", "type": "text", "required": true},
+      {"key": "event_date", "label": "Event date", "type": "date", "required": true},
+      {"key": "venue", "label": "Venue", "type": "text", "required": true},
+      {"key": "event_time", "label": "Event time", "type": "text", "required": false},
+      {"key": "contact_person", "label": "Contact person", "type": "text", "required": false}
+    ]
+  },
+  {
+    "type_id": "budget_request",
+    "name": "Budget Request",
+    "description": "Request for funds listing expected expenses for an event",
+    "template_file": "budget_request.docx",
+    "ref_code": "BUD",
+    "fields": [
+      {"key": "club_name", "label": "Club name", "type": "text", "required": true},
+      {"key": "event_name", "label": "Event name", "type": "text", "required": true},
+      {"key": "event_date", "label": "Event date", "type": "date", "required": true},
+      {"key": "total_amount", "label": "Total amount requested", "type": "number", "required": true},
+      {"key": "purpose", "label": "Purpose of funds", "type": "text", "required": true},
+      {"key": "faculty_coordinator", "label": "Faculty coordinator", "type": "text", "required": true}
+    ]
   }
 ]
