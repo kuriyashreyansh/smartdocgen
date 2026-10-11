@@ -2,7 +2,7 @@
   {
     "type_id": "permission_letter",
     "name": "Event Permission Letter",
-    "description": "Letter asking college authorities for permission to hold an event",
+    "description": " Formal letter asking college authorities for permission to organise an event or activity",
     "template_file": "permission_letter.docx",
     "fields": [
       {"key": "club_name", "label": "Club name", "type": "text", "required": true},
