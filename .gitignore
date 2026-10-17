@@ -227,3 +227,7 @@ storage/logos/
 *.db
 .streamlit/secrets.toml
 node_modules/
+# generated files
+backend/storage/outputs/
+backend/storage/pending/
+llm_cache.json
