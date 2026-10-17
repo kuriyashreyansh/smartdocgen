@@ -76,6 +76,19 @@
     "ai_sections": ["brief_description", "objectives"]
   },
   {
+    "type_id": "bill_summary",
+    "name": "Bill Summary",
+    "description": "Summary of the payments to be made for an event: prize money and other reimbursements with account details, a grand total and the officials' signatures",
+    "template_file": "bill_summary.docx",
+    "ref_code": "BS",
+    "ref_pattern": "{prefix}/{session_long}/{code}/{seq:03d}",
+    "fields": [
+      {"key": "event_name", "label": "Event name", "type": "text", "required": true, "question": "For which event is this bill summary? (for example: SIH Internal Hackathon)"},
+      {"key": "prize_rows", "label": "Prize money payees", "type": "table", "required": false, "any_of": "payees", "adds_to": "grand_total", "columns": [{"key": "name", "label": "Name", "type": "text"}, {"key": "account_details", "label": "Account details", "type": "text", "optional": true}, {"key": "pay_to", "label": "To be paid to", "type": "text", "optional": true}, {"key": "amount", "label": "Prize money (INR)", "type": "number", "format": "inr"}], "total": {"key": "prize_total", "column": "amount"}, "question": "Who gets prize money, and how much? Leave empty if there is none."},
+      {"key": "other_rows", "label": "Other payees (reimbursements)", "type": "table", "required": false, "any_of": "payees", "adds_to": "grand_total", "columns": [{"key": "name", "label": "Name", "type": "text"}, {"key": "account_details", "label": "Account details", "type": "text", "optional": true}, {"key": "pay_to", "label": "To be paid to", "type": "text", "optional": true}, {"key": "account_no", "label": "Account no.", "type": "text", "sensitive": true}, {"key": "ifsc", "label": "IFSC code", "type": "text"}, {"key": "amount", "label": "Amount (INR)", "type": "number", "format": "inr"}], "total": {"key": "other_total", "column": "amount"}, "question": "Who else should be paid (reimbursements)? Give name, bank details and amount."}
+    ]
+  },
+  {
     "type_id": "invitation_notice",
     "name": "Invitation Notice",
     "description": "Notice or invitation announcing an event to students",
