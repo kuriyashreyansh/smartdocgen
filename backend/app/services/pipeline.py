@@ -45,7 +45,9 @@ def parse_request(text, doc_type_override=None):
             "options": [{"type_id": d["type_id"], "name": d["name"]} for d in doc_types],
         }
 
-    doc_type = next(d for d in doc_types if d["type_id"] == doc_type_id)
+    doc_type = next((d for d in doc_types if d["type_id"] == doc_type_id), None)
+    if doc_type is None:
+        raise ValueError(f"Unknown document type: {doc_type_id}")
     fields = doc_type["fields"]
 
     # Step 2: extract raw values (A1)
