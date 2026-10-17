@@ -5,12 +5,14 @@ def _is_empty(value):
 
 def make_question(field):
     """Build a human-friendly question for a missing field."""
+    if field.get("question"):          # a custom question written in doc_types.json
+        return field["question"]
     label = field["label"].lower()
     if field["type"] == "date":
         return f"On which date is the {label}?"
     if field["type"] == "number":
         return f"What is the {label}? (enter a number)"
-    return f"What is the {label}?"
+    return f"Please provide: {field['label']}"
 
 
 def _is_valid_number(value):

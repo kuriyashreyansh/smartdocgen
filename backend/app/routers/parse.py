@@ -22,4 +22,4 @@ def parse(req: ParseRequest):
     try:
         return parse_request(req.text, req.doc_type)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parse failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Parse failed: {type(e).__name__}: {e}")
