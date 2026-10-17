@@ -89,6 +89,8 @@ def _process_tables(doc_type: DocType, fields: dict):
     """Check every table field (for example the expense list) and work out its totals.
     Returns (values_for_the_template, problems)."""
     values, problems = {}, []
+    grand, has_grand = 0.0, False
+    groups = {}
     for f in doc_type.fields:
         if f["type"] != "table":
             continue
@@ -102,7 +104,9 @@ def _process_tables(doc_type: DocType, fields: dict):
             for c in cols:
                 v = str(row.get(c["key"], "")).strip()
                 if not v:
-                    problems.append(f"{f['label']}: row {i} needs {c['label']}")
+                    if not c.get("optional"):
+                        problems.append(f"{f['label']}: row {i} needs {c['label']}")
+                    out[c["key"]] = ""
                     continue
                 if c.get("type") == "number":
                     try:
@@ -120,6 +124,15 @@ def _process_tables(doc_type: DocType, fields: dict):
         values[f["key"]] = rows_out
         if f.get("total"):
             values[f["total"]["key"]] = _format_inr(total)
+        if f.get("adds_to") == "grand_total":
+            has_grand, grand = True, grand + total
+        if f.get("any_of"):
+            groups.setdefault(f["any_of"], []).append((f["label"], bool(rows_out)))
+    if has_grand:
+        values["grand_total"] = _format_inr(grand)
+    for labels in groups.values():
+        if not any(filled for _, filled in labels):
+            problems.append("Add at least one row in: " + " or ".join(label for label, _ in labels))
     return values, problems
 
 
@@ -131,7 +144,14 @@ def _mask(value) -> str:
 def _storable(fields: dict, doc_type: DocType) -> dict:
     """What goes into the history: bank and PAN numbers are kept only as their last 4 characters."""
     sensitive = {f["key"] for f in doc_type.fields if f.get("sensitive")}
-    return {k: (_mask(v) if k in sensitive else v) for k, v in fields.items()}
+    out = {k: (_mask(v) if k in sensitive else v) for k, v in fields.items()}
+    for f in doc_type.fields:
+        if f["type"] == "table" and isinstance(out.get(f["key"]), list):
+            hidden = {c["key"] for c in f["columns"] if c.get("sensitive")}
+            if hidden:
+                out[f["key"]] = [{ck: (_mask(cv) if ck in hidden and cv else cv) for ck, cv in row.items()}
+                                 for row in out[f["key"]] if isinstance(row, dict)]
+    return out
 
 
 def _date_warnings(doc_type: DocType, fields: dict) -> list[str]:
