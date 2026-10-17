@@ -54,6 +54,28 @@
     ]
   },
   {
+    "type_id": "submitted_note",
+    "name": "Submitted (Approval Note to Dean)",
+    "description": "Approval note submitted to the Dean (Students Welfare) asking permission to conduct an event, with its category, objectives, audience, judges and a financial proposal with expenses",
+    "template_file": "submitted_note.docx",
+    "ref_code": "NOTE",
+    "ref_pattern": "{prefix}/{session_long}/{event_code}/{seq:03d}",
+    "fields": [
+      {"key": "event_code", "label": "Event code", "type": "text", "required": true, "question": "What short code should the reference number use for this event? (for example: SIH)"},
+      {"key": "event_title", "label": "Title of the event", "type": "text", "required": true, "question": "What is the title of the event? (for example: Internal Hackathon of SIH)"},
+      {"key": "event_date", "label": "Schedule of event (date)", "type": "date", "required": true, "date_check": "future", "weekday": true, "question": "On which date is the event?"},
+      {"key": "venue", "label": "Event venue", "type": "text", "required": true, "question": "Where will the event be held?"},
+      {"key": "category", "label": "Category of the event", "type": "text", "required": true, "question": "What category is the event? (for example: Hackathon, Workshop, Contest)"},
+      {"key": "brief_description", "label": "Brief description", "type": "longtext", "required": true, "question": "Give a short description of the event, or use the AI draft button."},
+      {"key": "objectives", "label": "Objectives", "type": "longtext", "required": true, "question": "What are the objectives of the event?"},
+      {"key": "target_audience", "label": "Target audience", "type": "text", "required": true, "question": "Who is the event for? (for example: All year students)"},
+      {"key": "expected_participants", "label": "Expected number of participants", "type": "text", "required": true, "question": "How many participants are expected? (for example: 1000+)"},
+      {"key": "judges", "label": "Name of judges", "type": "text", "required": false, "question": "Who are the judges, if there are any?"},
+      {"key": "expenses", "label": "Financial proposal (expenses)", "type": "table", "required": true, "columns": [{"key": "item", "label": "Item", "type": "text"}, {"key": "amount", "label": "Approximate amount (Rs.)", "type": "number", "format": "inr"}], "total": {"key": "expenses_total", "column": "amount"}, "question": "What are the expenses? List each item with its approximate amount."}
+    ],
+    "ai_sections": ["brief_description", "objectives"]
+  },
+  {
     "type_id": "invitation_notice",
     "name": "Invitation Notice",
     "description": "Notice or invitation announcing an event to students",

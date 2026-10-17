@@ -34,15 +34,21 @@ def academic_session(today: datetime | None = None):
                    "session_long": f"{start}-{end % 100:02d}"}
 
 
-def make_ref_no(db: Session, club: Club, doc_type: DocType) -> str:
-    start, names = academic_session()
-    count = (db.query(func.count(Document.id))
-               .filter(Document.club_id == club.id,
-                       Document.doc_type_id == doc_type.id,
-                       Document.created_at >= datetime(start, 7, 1))
-               .scalar())
+def make_ref_no(db: Session, club: Club, doc_type: DocType, fields: dict | None = None) -> str:
+    """First free number for this pattern, e.g. ACM/2026-27/SIH/001, then /002 for the next one."""
+    _, names = academic_session()
+    extra = {}
+    if fields and fields.get("event_code"):
+        extra["event_code"] = re.sub(r"[^A-Za-z0-9]", "", str(fields["event_code"])).upper()
     pattern = doc_type.ref_pattern or DEFAULT_PATTERN
-    return pattern.format(prefix=club.ref_prefix, code=doc_type.ref_code, seq=count + 1, **names)
+    seq = 1
+    while True:
+        candidate = pattern.format(prefix=club.ref_prefix, code=doc_type.ref_code, seq=seq, **names, **extra)
+        taken = (db.query(Document.id)
+                   .filter(Document.club_id == club.id, Document.ref_no == candidate).first())
+        if not taken:
+            return candidate
+        seq += 1
 
 
 def _format_inr(value):
@@ -63,6 +69,58 @@ def _format_inr(value):
             parts.insert(0, head)
         s = ",".join(parts + [tail])
     return f"{s}.{frac:02d}" if frac else s
+
+
+def _pretty_date(value, with_day=False):
+    """'2026-10-20' or '20-10-2026' -> '20 October 2026' (plus ', Tuesday' when asked). Unreadable text is kept as typed."""
+    try:
+        from app.services.date_utils import normalize_date
+        iso, _ = normalize_date(value)
+        if not iso:
+            return value
+        d = date.fromisoformat(str(iso)[:10])
+        text = f"{d.day} {d:%B %Y}"
+        return f"{text}, {d:%A}" if with_day else text
+    except Exception:
+        return value
+
+
+def _process_tables(doc_type: DocType, fields: dict):
+    """Check every table field (for example the expense list) and work out its totals.
+    Returns (values_for_the_template, problems)."""
+    values, problems = {}, []
+    for f in doc_type.fields:
+        if f["type"] != "table":
+            continue
+        rows_in = fields.get(f["key"]) or []
+        cols = f["columns"]
+        rows_out, total = [], 0.0
+        for i, row in enumerate(rows_in, start=1):
+            if not any(str(row.get(c["key"], "")).strip() for c in cols):
+                continue                                   # blank line, ignore
+            out = {}
+            for c in cols:
+                v = str(row.get(c["key"], "")).strip()
+                if not v:
+                    problems.append(f"{f['label']}: row {i} needs {c['label']}")
+                    continue
+                if c.get("type") == "number":
+                    try:
+                        num = float(v.replace(",", ""))
+                    except ValueError:
+                        problems.append(f"{f['label']}: row {i}, {c['label']} must be a number")
+                        continue
+                    if f.get("total", {}).get("column") == c["key"]:
+                        total += num
+                    v = _format_inr(v) if c.get("format") == "inr" else v
+                out[c["key"]] = v
+            rows_out.append(out)
+        if not rows_out and f.get("required"):
+            problems.append(f"{f['label']}: add at least one row")
+        values[f["key"]] = rows_out
+        if f.get("total"):
+            values[f["total"]["key"]] = _format_inr(total)
+    return values, problems
 
 
 def _mask(value) -> str:
@@ -106,9 +164,11 @@ def _lookup(db: Session, type_id: str, club_id: int):
 
 def _create_document(db: Session, doc_type: DocType, club: Club, fields: dict, document_id=None) -> dict:
     # Never invent: refuse if any required field is missing
-    missing = [f["key"] for f in doc_type.fields if f.get("required") and f["key"] not in fields]
-    if missing:
-        raise MissingFields(missing)
+    missing = [f["key"] for f in doc_type.fields
+               if f.get("required") and f["type"] != "table" and f["key"] not in fields]
+    table_values, table_problems = _process_tables(doc_type, fields)
+    if missing or table_problems:
+        raise MissingFields(missing + table_problems)
 
     # New document, or a new version of an existing one
     if document_id:
@@ -118,7 +178,7 @@ def _create_document(db: Session, doc_type: DocType, club: Club, fields: dict, d
         version = len(doc.versions) + 1
     else:
         doc = Document(club_id=club.id, doc_type_id=doc_type.id,
-                       ref_no=fields.get("ref_no") or make_ref_no(db, club, doc_type))
+                       ref_no=fields.get("ref_no") or make_ref_no(db, club, doc_type, fields))
         db.add(doc)
         db.flush()
         version = 1
@@ -132,9 +192,14 @@ def _create_document(db: Session, doc_type: DocType, club: Club, fields: dict, d
         "ref_no": doc.ref_no,
         "letter_date": fields.get("letter_date") or datetime.now().strftime("%d %B %Y"),
     }
-    for f in doc_type.fields:              # amounts in Indian digit grouping
-        if f.get("format") == "inr" and f["key"] in fields:
+    context.update(table_values)           # table rows and totals
+    for f in doc_type.fields:
+        if f["key"] not in fields:
+            continue
+        if f.get("format") == "inr":       # amounts in Indian digit grouping
             context[f["key"]] = _format_inr(fields[f["key"]])
+        elif f["type"] == "date":          # dates as '20 October 2026' (with the weekday when asked)
+            context[f["key"]] = _pretty_date(fields[f["key"]], f.get("weekday", False))
 
     base = f"{doc.id}_v{version}"
     try:
