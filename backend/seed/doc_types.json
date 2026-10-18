@@ -89,6 +89,37 @@
     ]
   },
   {
+    "type_id": "bill_certificate",
+    "name": "Bill Certificate (Form BC-R)",
+    "description": "Bill certificate for recurring expenditure (Form BC-R): certifies purchased items, supplier and payment details for an approved event and is sent for bill payment",
+    "template_file": "bill_certificate.docx",
+    "ref_code": "BC",
+    "ref_pattern": "{prefix}/{session_long}/{code}/{seq:03d}",
+    "fields": [
+      {"key": "approval_note_no", "label": "Approval note no.", "type": "text", "required": true, "links_to": "submitted_note", "question": "Which approval note is this bill for? Pick it from the list or type its number (for example: ACM/2026-27/SIH/001)"},
+      {"key": "approval_note_date", "label": "Approval note date", "type": "date", "required": false, "date_style": "numeric", "question": "What is the date of the approval note? (filled automatically when the note was made here)"},
+      {"key": "purchase_order", "label": "Purchase order no. and date", "type": "text", "required": false, "question": "Purchase order number and date, if any (leave empty for NiL)"},
+      {"key": "advance_drawn", "label": "Advance drawn (Rs.)", "type": "text", "required": false, "question": "Advance drawn in rupees, if any (leave empty for NiL)"},
+      {"key": "certifier_name", "label": "Name of the person certifying the goods", "type": "text", "required": false, "question": "Who certifies the goods (the 'I, am ...' line)? Leave empty to write the name by hand."},
+      {"key": "items", "label": "Items purchased", "type": "table", "required": true, "columns": [{"key": "name", "label": "Name of the item", "type": "text"}, {"key": "quantity", "label": "Quantity", "type": "number"}, {"key": "unit_cost", "label": "Unit cost (Rs.)", "type": "number", "format": "inr"}, {"key": "line_total", "label": "Total cost (Rs.)", "type": "number", "format": "inr", "multiply": ["quantity", "unit_cost"]}], "total": {"key": "items_total", "column": "line_total", "also": [{"key": "total_with_taxes", "add": "taxes"}]}, "question": "What was purchased? List each item with its quantity and unit cost."},
+      {"key": "taxes", "label": "Taxes or other charges (Rs.)", "type": "number", "required": false, "format": "inr", "question": "Taxes or other charges in rupees, if any"},
+      {"key": "supplier_name", "label": "Name of the supplier", "type": "text", "required": true, "question": "What is the name of the supplier?"},
+      {"key": "supplier_gst", "label": "GST no.", "type": "text", "required": false, "question": "What is the supplier's GST number, if any?"},
+      {"key": "other_taxes", "label": "Any other taxes", "type": "text", "required": false, "question": "Any other taxes? (leave empty for a dash)"},
+      {"key": "invoice_no", "label": "Invoice no.", "type": "text", "required": true, "question": "What is the invoice number?"},
+      {"key": "invoice_date", "label": "Invoice date", "type": "date", "required": true, "date_style": "numeric", "question": "What is the invoice date?"},
+      {"key": "invoice_amount", "label": "Invoice amount (Rs.)", "type": "number", "required": false, "format": "inr", "question": "Invoice amount, only if it differs from the total including taxes"},
+      {"key": "party_name", "label": "Name of the party", "type": "text", "required": true, "question": "Who is to be paid (name of the party)?"},
+      {"key": "account_no", "label": "Account number", "type": "text", "required": true, "sensitive": true, "question": "What is the party's account number?"},
+      {"key": "account_holder", "label": "Account holder name", "type": "text", "required": true, "question": "What is the account holder's name?"},
+      {"key": "bank_name", "label": "Name of the bank", "type": "text", "required": true, "question": "Which bank is the account in?"},
+      {"key": "bank_branch", "label": "Name of the branch", "type": "text", "required": true, "question": "Which branch is the account in?"},
+      {"key": "ifsc", "label": "IFSC code", "type": "text", "required": true, "question": "What is the IFSC code?"},
+      {"key": "indenter_designation", "label": "Faculty designation", "type": "text", "required": false, "question": "Designation of the faculty chairman (leave empty for Assistant Professor)"},
+      {"key": "lab_office", "label": "Laboratory / office", "type": "text", "required": false, "question": "Laboratory or office for the stock entry (leave empty for Student Council)"}
+    ]
+  },
+  {
     "type_id": "invitation_notice",
     "name": "Invitation Notice",
     "description": "Notice or invitation announcing an event to students",

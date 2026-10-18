@@ -71,18 +71,25 @@ def _format_inr(value):
     return f"{s}.{frac:02d}" if frac else s
 
 
-def _pretty_date(value, with_day=False):
-    """'2026-10-20' or '20-10-2026' -> '20 October 2026' (plus ', Tuesday' when asked). Unreadable text is kept as typed."""
+def _pretty_date(value, with_day=False, numeric=False):
+    """'2026-10-20' or '20-10-2026' -> '20 October 2026' (plus ', Tuesday' when asked, or 20/10/2026 in numeric style).
+    Unreadable text is kept as typed."""
     try:
         from app.services.date_utils import normalize_date
         iso, _ = normalize_date(value)
         if not iso:
             return value
         d = date.fromisoformat(str(iso)[:10])
+        if numeric:
+            return d.strftime("%d/%m/%Y")
         text = f"{d.day} {d:%B %Y}"
         return f"{text}, {d:%A}" if with_day else text
     except Exception:
         return value
+
+
+def _num(v) -> float:
+    return float(str(v).replace(",", "").strip())
 
 
 def _process_tables(doc_type: DocType, fields: dict):
@@ -96,12 +103,14 @@ def _process_tables(doc_type: DocType, fields: dict):
             continue
         rows_in = fields.get(f["key"]) or []
         cols = f["columns"]
+        entered = [c for c in cols if not c.get("multiply")]       # columns the user types
+        total_col = (f.get("total") or {}).get("column")
         rows_out, total = [], 0.0
         for i, row in enumerate(rows_in, start=1):
-            if not any(str(row.get(c["key"], "")).strip() for c in cols):
-                continue                                   # blank line, ignore
-            out = {}
-            for c in cols:
+            if not any(str(row.get(c["key"], "")).strip() for c in entered):
+                continue                                           # blank line, ignore
+            out, nums = {}, {}
+            for c in entered:
                 v = str(row.get(c["key"], "")).strip()
                 if not v:
                     if not c.get("optional"):
@@ -110,20 +119,39 @@ def _process_tables(doc_type: DocType, fields: dict):
                     continue
                 if c.get("type") == "number":
                     try:
-                        num = float(v.replace(",", ""))
+                        nums[c["key"]] = _num(v)
                     except ValueError:
                         problems.append(f"{f['label']}: row {i}, {c['label']} must be a number")
                         continue
-                    if f.get("total", {}).get("column") == c["key"]:
-                        total += num
+                    if total_col == c["key"]:
+                        total += nums[c["key"]]
                     v = _format_inr(v) if c.get("format") == "inr" else v
                 out[c["key"]] = v
+            for c in cols:                                         # computed columns, e.g. quantity x unit cost
+                if c.get("multiply"):
+                    a, b = c["multiply"]
+                    if a in nums and b in nums:
+                        val = nums[a] * nums[b]
+                        if total_col == c["key"]:
+                            total += val
+                        out[c["key"]] = _format_inr(val) if c.get("format") == "inr" else str(val)
+                    else:
+                        out[c["key"]] = ""
             rows_out.append(out)
         if not rows_out and f.get("required"):
             problems.append(f"{f['label']}: add at least one row")
         values[f["key"]] = rows_out
         if f.get("total"):
             values[f["total"]["key"]] = _format_inr(total)
+            for extra in f["total"].get("also", []):               # e.g. total + taxes
+                add = 0.0
+                raw = fields.get(extra["add"])
+                if raw not in (None, ""):
+                    try:
+                        add = _num(raw)
+                    except ValueError:
+                        problems.append(f"{extra['add'].replace('_', ' ').capitalize()} must be a number")
+                values[extra["key"]] = _format_inr(total + add)
         if f.get("adds_to") == "grand_total":
             has_grand, grand = True, grand + total
         if f.get("any_of"):
@@ -218,8 +246,18 @@ def _create_document(db: Session, doc_type: DocType, club: Club, fields: dict, d
             continue
         if f.get("format") == "inr":       # amounts in Indian digit grouping
             context[f["key"]] = _format_inr(fields[f["key"]])
-        elif f["type"] == "date":          # dates as '20 October 2026' (with the weekday when asked)
-            context[f["key"]] = _pretty_date(fields[f["key"]], f.get("weekday", False))
+        elif f["type"] == "date":          # dates as '20 October 2026' (or 20/10/2026, or with the weekday)
+            context[f["key"]] = _pretty_date(fields[f["key"]], f.get("weekday", False), f.get("date_style") == "numeric")
+    link_warnings = []
+    for f in doc_type.fields:              # e.g. a bill certificate points to its approval note
+        if f.get("links_to") and fields.get(f["key"]):
+            linked = (db.query(Document).join(DocType, Document.doc_type_id == DocType.id)
+                        .filter(DocType.type_id == f["links_to"], Document.club_id == club.id,
+                                Document.ref_no == str(fields[f["key"]]).strip()).first())
+            if linked:
+                context[f["key"] + "__date"] = linked.created_at.strftime("%d/%m/%Y")
+            else:
+                link_warnings.append(f"{f['label']} {fields[f['key']]} was not found among the documents made here.")
 
     base = f"{doc.id}_v{version}"
     try:
@@ -234,7 +272,7 @@ def _create_document(db: Session, doc_type: DocType, club: Club, fields: dict, d
     db.commit()
     return {"document_id": doc.id, "version": version, "ref_no": doc.ref_no,
             "docx_url": f"/files/{docx_path.name}", "pdf_url": f"/files/{pdf_path.name}",
-            "warnings": _date_warnings(doc_type, fields)}
+            "warnings": _date_warnings(doc_type, fields) + link_warnings}
 
 
 @router.post("/generate", response_model=GenerateResponse)
