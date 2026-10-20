@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,9 +13,18 @@ Base.metadata.create_all(engine)
 app = FastAPI(title="SmartDoc")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-OUTPUTS = Path(__file__).parent.parent / "storage" / "outputs"
-OUTPUTS.mkdir(parents=True, exist_ok=True)
-app.mount("/files", StaticFiles(directory=OUTPUTS), name="files")
+# Use /tmp on Vercel because the standard filesystem is read-only
+if os.environ.get("VERCEL"):
+    OUTPUTS = Path("/tmp/storage/outputs")
+else:
+    OUTPUTS = Path(__file__).parent.parent / "storage" / "outputs"
+
+try:
+    OUTPUTS.mkdir(parents=True, exist_ok=True)
+    app.mount("/files", StaticFiles(directory=OUTPUTS), name="files")
+except OSError:
+    # Fallback or pass if directory creation fails in strict serverless environments
+    pass
 
 app.include_router(generate.router)
 app.include_router(ai.router)
