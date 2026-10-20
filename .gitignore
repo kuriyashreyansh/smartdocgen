@@ -232,3 +232,5 @@ node_modules/
 backend/storage/outputs/
 backend/storage/pending/
 llm_cache.json
+
+backend/seed/officials.json
