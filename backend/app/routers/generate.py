@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Club, DocType, Document, DocumentVersion
+from pydantic import BaseModel
 from app.schemas import GenerateRequest, GenerateResponse, BatchRequest
 from app.services.renderer import render_docx, OUTPUTS
 from app.services.pdf_converter import docx_to_pdf
@@ -287,19 +288,16 @@ def generate(req: GenerateRequest, db: Session = Depends(get_db)):
     return GenerateResponse(**result)
 
 
-@router.post("/generate/batch")
-def generate_batch(req: BatchRequest, db: Session = Depends(get_db)):
-    """One document per row (for example one receipt per winner), returned together in a zip."""
-    if not req.rows:
-        raise HTTPException(422, "No rows to generate")
-    if len(req.rows) > MAX_BATCH:
-        raise HTTPException(422, f"Too many rows (maximum {MAX_BATCH})")
-    doc_type, club = _lookup(db, req.doc_type, req.club_id)
+def _safe(text: str, fallback: str = "document") -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or fallback
 
+
+def _run_batch(db: Session, doc_type: DocType, club: Club, common: dict, rows: list):
+    """One document per row. Returns (results, made) where made = [(row_no, label, result)]."""
     name_key = next((f["key"] for f in doc_type.fields if f.get("per_row") and f["type"] == "text"), None)
     results, made = [], []
-    for i, row in enumerate(req.rows, start=1):
-        fields = {**_clean(req.common), **_clean(row)}          # row values win over shared ones
+    for i, row in enumerate(rows, start=1):
+        fields = {**_clean(common), **_clean(row)}              # row values win over shared ones
         label = str(fields.get(name_key, "")) if name_key else ""
         try:
             r = _create_document(db, doc_type, club, fields)
@@ -309,15 +307,108 @@ def generate_batch(req: BatchRequest, db: Session = Depends(get_db)):
             results.append({"row": i, "name": label, "status": "error", "missing": e.keys})
         except Exception as e:
             results.append({"row": i, "name": label, "status": "error", "message": str(e) or type(e).__name__})
+    return results, made
 
-    zip_url = None
-    if made:
-        zip_name = f"batch_{datetime.now():%Y%m%d_%H%M%S}.zip"
-        with zipfile.ZipFile(OUTPUTS / zip_name, "w", zipfile.ZIP_DEFLATED) as z:
-            for i, label, r in made:
-                safe = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_") or "document"
-                for url in (r["pdf_url"], r["docx_url"]):
-                    z.write(OUTPUTS / url.split("/")[-1], f"{i:02d}_{safe}.{url.rsplit('.', 1)[-1]}")
-        zip_url = f"/files/{zip_name}"
-    return {"count_ok": len(made), "count_error": len(results) - len(made),
-            "results": results, "zip_url": zip_url}
+
+def _write_zip(prefix: str, entries):
+    """entries = [(folder_or_empty, base_name, result)] -> zip with the PDF and DOCX of each result."""
+    name = f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}.zip"
+    with zipfile.ZipFile(OUTPUTS / name, "w", zipfile.ZIP_DEFLATED) as z:
+        for folder, base, r in entries:
+            for url in (r["pdf_url"], r["docx_url"]):
+                arc = f"{base}.{url.rsplit('.', 1)[-1]}"
+                z.write(OUTPUTS / url.split("/")[-1], f"{folder}/{arc}" if folder else arc)
+    return f"/files/{name}"
+
+
+@router.post("/generate/batch")
+def generate_batch(req: BatchRequest, db: Session = Depends(get_db)):
+    """One document per row (for example one receipt per winner), returned together in a zip."""
+    if not req.rows:
+        raise HTTPException(422, "No rows to generate")
+    if len(req.rows) > MAX_BATCH:
+        raise HTTPException(422, f"Too many rows (maximum {MAX_BATCH})")
+    doc_type, club = _lookup(db, req.doc_type, req.club_id)
+    results, made = _run_batch(db, doc_type, club, req.common, req.rows)
+    zip_url = _write_zip("batch", [("", f"{i:02d}_{_safe(label)}", r) for i, label, r in made]) if made else None
+    return {"count_ok": len(made), "count_error": len(results) - len(made), "results": results, "zip_url": zip_url}
+
+
+# ---------------------------------------------------------------- document pack
+PACK_ORDER = ["permission_letter", "prize_money_receipt", "submitted_note", "bill_summary", "bill_certificate"]
+
+
+class PackRequest(BaseModel):
+    club_id: int = 1
+    event: dict = {}                 # details shared by every document of the event
+    documents: dict[str, dict] = {}  # which documents to make, each with the details only it needs
+
+
+def _pack_fields(doc_type: DocType, shared: dict, extra: dict) -> dict:
+    """A document's own details first, then the shared event details (also under another name via 'from')."""
+    empty = (None, "", [])
+    out = {}
+    for f in doc_type.fields:
+        v = extra.get(f["key"])
+        if v in empty:
+            v = shared.get(f["key"])
+        if v in empty and f.get("from"):
+            v = shared.get(f["from"])
+        if v not in empty:
+            out[f["key"]] = v
+    for k, v in extra.items():                      # overrides such as ref_no that are not form fields
+        if k not in out and v not in empty:
+            out[k] = v
+    return out
+
+
+@router.post("/generate/pack")
+def generate_pack(req: PackRequest, db: Session = Depends(get_db)):
+    """Make several documents for one event in priority order, sharing the event details between them."""
+    unknown = [k for k in req.documents if k not in PACK_ORDER]
+    if unknown:
+        raise HTTPException(422, "Not part of the pack: " + ", ".join(unknown))
+    if not req.documents:
+        raise HTTPException(422, "Choose at least one document")
+    club = db.get(Club, req.club_id)
+    if not club:
+        raise HTTPException(404, "Club not found")
+
+    shared, winners = _clean(req.event), []
+    results, entries, ok = [], [], 0
+    for order, type_id in enumerate(PACK_ORDER, start=1):
+        if type_id not in req.documents:
+            continue
+        extra = dict(req.documents[type_id] or {})
+        doc_type = db.query(DocType).filter_by(type_id=type_id).first()
+        if not doc_type:
+            results.append({"type": type_id, "name": type_id, "status": "error", "message": "document type not found"})
+            continue
+        item = {"type": type_id, "name": doc_type.name}
+        try:
+            if type_id == "prize_money_receipt":
+                winners = extra.pop("rows", None) or []
+                if not winners:
+                    raise MissingFields(["winners (add at least one row)"])
+                sub, made = _run_batch(db, doc_type, club, _pack_fields(doc_type, shared, extra), winners)
+                item.update(status="ok" if len(made) == len(sub) else ("partial" if made else "error"), documents=sub)
+                entries += [(f"{order:02d}_{_safe(doc_type.name)}", f"{i:02d}_{_safe(label)}", r) for i, label, r in made]
+                ok += len(made)
+            else:
+                if type_id == "bill_summary" and not extra.get("prize_rows") and winners:
+                    extra["prize_rows"] = [{"name": w.get("student_name", ""), "amount": w.get("amount", "")} for w in winners]
+                r = _create_document(db, doc_type, club, _pack_fields(doc_type, shared, extra))
+                item.update(status="ok", **r)
+                entries.append(("", f"{order:02d}_{_safe(doc_type.name)}", r))
+                ok += 1
+                if type_id == "submitted_note":
+                    shared["approval_note_no"] = r["ref_no"]       # the bill certificate points to this note
+        except MissingFields as e:
+            item.update(status="error", missing=e.keys)
+        except Exception as e:
+            item.update(status="error", message=str(e) or type(e).__name__)
+        results.append(item)
+
+    zip_url = _write_zip("pack", entries) if entries else None
+    failed = sum(1 for r in results if r["status"] != "ok")
+    return {"count_ok": ok, "count_attention": failed, "results": results, "zip_url": zip_url}
